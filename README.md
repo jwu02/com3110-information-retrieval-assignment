@@ -7,7 +7,9 @@
     - `python eval_ir.py cacm_gold_std.txt results_file.txt`
     - execute script with its help option `-h` for instructions on use
 - `IR_engine.py` is the ‘outer shell’ of a retrieval engine
-    - `python IR_engine.py -o results_file.txt`
+    - `python IR_engine.py -s -p -w tfidf -o results_file.txt`
+        - `-h` list command line options
+        - `-s` use stoplist
+        - `-p` use stemming
     - loads a (preprocessed) index and query set, from the file IR `data.pickle`
     - then ‘batch processes’ the queries to compute the 10 best-ranking documents for each, which it prints to a results file
-    - run program with its `-h` option to list its command line options
