@@ -17,7 +17,7 @@ class Retrieve:
         self.relevant_doc_ids = set()
         
         tf_moderation_methods = ['none', 'log_tf', 'max_tf_norm']
-        self.moderate_term_frequency = tf_moderation_methods[0]
+        self.moderate_term_frequency = tf_moderation_methods[1]
     
 
     def compute_number_of_documents(self):
@@ -93,7 +93,8 @@ class Retrieve:
 
     def tf_retrieval(self) -> list:
         """
-        Vector space retrieval model: term frequency
+        Vector space retrieval model: term frequency\n
+        Return top most similar documents
         """
         tf_wds = self.get_tfs()
         
@@ -123,7 +124,7 @@ class Retrieve:
 
     def get_tfs(self) -> dict:
         """
-        Return a dictionary which maps document ids, to terms, to frequency of occurrences
+        Return a dictionary which maps document ids, to terms, to term frequency
         """
         # tf_{w,d} = term frequency, occurrences of query term w in a document d
         tf_wds = {}
@@ -169,11 +170,13 @@ class Retrieve:
 
     def get_idfs(self) -> dict:
         """
-        Return a dictionary which maps query terms w to inverse document frequencies
+        Return a dictionary which maps query terms w to its inverse document frequency
         """
         # document frequency - number of documents containing each term w in query
         df_ws = {w:len(self.index[w]) for w in self.query}
 
+        # {term: idf}
+        # idf = number of documents in collection / document frequency
         idfs = {w:math.log(self.num_docs/df_ws[w]) for w in df_ws}
 
         return idfs
@@ -190,9 +193,11 @@ class Retrieve:
         """
         Return a dictionary which maps document id to terms, to tfidfs (tf x idf)
         """
-        tfidfs = {} # dictionary storing tfidfs for each document
+        tfidfs = {} # {doc_id: {term: frequency}}
         for doc_id in tf_wds:
-            tf_wd = tf_wds[doc_id]
+            tf_wd = tf_wds[doc_id] # {term: frequency}
+            # for each query term multiply its term frequency by its 
+            # inverse document frequency
             tfidfs[doc_id] = {w:tf_wd[w]*idfs[w] for w in self.query}
         
         return tfidfs
