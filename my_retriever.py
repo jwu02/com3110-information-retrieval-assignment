@@ -15,6 +15,9 @@ class Retrieve:
 
         self.query = dict()
         self.relevant_doc_ids = set()
+        
+        tf_moderation_methods = ['none', 'log_tf', 'max_tf_norm']
+        self.moderate_term_frequency = tf_moderation_methods[0]
     
 
     def compute_number_of_documents(self):
@@ -74,11 +77,11 @@ class Retrieve:
     def binary_retrieval(self) -> list:
         """
         Binary model\n
-        Retrieves documents with any query term occurrences\n
+        Retrieves documents with any query term occurrences (disjunction of all query terms)\n
         Return top documents with most query term occurrences
         """
         # term frequency of words in a particular document
-        tf_wds = self.get_tf_wd_dict()
+        tf_wds = self.get_tfs()
         
         for doc_id in tf_wds:
             # replace dict values with the sum of all query term occurrences 
@@ -92,9 +95,9 @@ class Retrieve:
         """
         Vector space retrieval model: term frequency
         """
-        tf_wds = self.get_tf_wd_dict()
+        tf_wds = self.get_tfs()
         
-        similarity_scores = self.get_similarty_score_dict(self.query, tf_wds)
+        similarity_scores = self.get_similarty_scores(self.query, tf_wds)
 
         return self.get_top_relevant_doc_ids(similarity_scores)
 
@@ -106,19 +109,19 @@ class Retrieve:
         Multiplies the term frequency by the inverse document frequency 
         to provide a better term weighting scheme
         """
-        tf_wds = self.get_tf_wd_dict() # term frequencies tf, of terms w, in a document d
-        idfs = self.get_idf_dict() # inverse document frequencies
+        tf_wds = self.get_tfs() # term frequencies tf, of terms w, in a document d
+        idfs = self.get_idfs() # inverse document frequencies
 
         # vector of representation of query: 1 x idfs = idfs (?) -> No
         query_tfidfs = self.get_query_tfidfs(idfs)
-        document_tfidfs = self.get_document_tfidfs_dict(tf_wds, idfs)
+        document_tfidfs = self.get_document_tfidfs(tf_wds, idfs)
 
-        similarity_scores = self.get_similarty_score_dict(query_tfidfs, document_tfidfs)
+        similarity_scores = self.get_similarty_scores(query_tfidfs, document_tfidfs)
 
         return self.get_top_relevant_doc_ids(similarity_scores)
 
 
-    def get_tf_wd_dict(self) -> dict:
+    def get_tfs(self) -> dict:
         """
         Return a dictionary which maps document ids, to terms, to frequency of occurrences
         """
@@ -128,16 +131,43 @@ class Retrieve:
             tf_wd = {}
             for w in self.query:
                 if doc_id in self.index[w]:
-                    tf_wd[w] = self.index[w][doc_id]
-                else: # if doc_id doesn't occur in index for a term
+                    # moderate term frequency
+                    if self.moderate_term_frequency == 'log_tf':
+                        tf_wd[w] = 1+math.log(self.index[w][doc_id])
+                    else:
+                        tf_wd[w] = self.index[w][doc_id]
+                else: # if a query term doesn't occur in a document
                     tf_wd[w] = 0
 
             tf_wds[doc_id] = tf_wd
         
+        # moderate term frequency
+        if self.moderate_term_frequency == 'max_tf_norm':
+            tf_wds = self.apply_max_tf_normalization(tf_wds)
+
         return tf_wds
 
 
-    def get_idf_dict(self) -> dict:
+    def apply_max_tf_normalization(self, tf_wds: dict) -> dict:
+        """
+        Return a term frequency dict with maximum tf normalization applied\n
+        Has the effect of normalising the raw frequency count by the freqeuncy\n
+        of the most frequent term in each document
+        """
+        a = 0.3 # smoothing factor
+
+        for doc_id in tf_wds:
+            # max term frequency count of for a document d
+            tf_max_d = max(tf_wds[doc_id].values())
+
+            for w in tf_wds[doc_id]:
+                tf_wd = tf_wds[doc_id][w]
+                tf_wds[doc_id][w] = a + (1-a)*(tf_wd/tf_max_d)
+        
+        return tf_wds
+
+
+    def get_idfs(self) -> dict:
         """
         Return a dictionary which maps query terms w to inverse document frequencies
         """
@@ -156,7 +186,7 @@ class Retrieve:
         return {w:self.query[w]*idfs[w] for w in self.query}
 
 
-    def get_document_tfidfs_dict(self, tf_wds: dict, idfs: dict) -> dict:
+    def get_document_tfidfs(self, tf_wds: dict, idfs: dict) -> dict:
         """
         Return a dictionary which maps document id to terms, to tfidfs (tf x idf)
         """
@@ -168,7 +198,7 @@ class Retrieve:
         return tfidfs
 
 
-    def get_similarty_score_dict(self, query_tfidfs: dict, document_tfidfs: dict) -> dict:
+    def get_similarty_scores(self, query_tfidfs: dict, document_tfidfs: dict) -> dict:
         """
         Return a dictionary which maps document id to a similarity score,
         the bigger the higher ranked the document relevance
