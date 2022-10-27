@@ -73,41 +73,35 @@ class Retrieve:
 
     def binary_retrieval(self) -> list:
         """
-        Only care about whether terms occur in a document, nothing more
-        Count number of occurrences of query terms in each document
-        Return top ten most occurrences
+        Binary model\n
+        Retrieves documents with any query term occurrences\n
+        Return top documents with most query term occurrences
         """
-        relevant_docs = {}
-        # check if each term is in index
-        for w in self.query:
-            if w in self.index:
-                # and record total number of occurrences of each term, for each document
-                for doc_id in self.index[w]:
-                    if doc_id in relevant_docs:
-                        relevant_docs[doc_id] += self.index[w][doc_id]
-                    else:
-                        relevant_docs[doc_id] = self.index[w][doc_id]
-
-        return self.get_top_relevant_doc_ids(relevant_docs)
-
-
-    def tf_retrieval(self) -> list:
-        """
-        Term frequency retrieval ranks documents with most occurrrences of 
-        query terms more highly
-        """
+        # term frequency of words in a particular document
         tf_wds = self.get_tf_wd_dict()
         
         for doc_id in tf_wds:
-            # replace list of query term frequencies for each document with 
-            # the sum of all query term occurrences in a document
+            # replace dict values with the sum of all query term occurrences 
+            # in a document
             tf_wds[doc_id] = sum(tf_wds[doc_id].values())
 
         return self.get_top_relevant_doc_ids(tf_wds)
 
 
+    def tf_retrieval(self) -> list:
+        """
+        Vector space retrieval model: term frequency
+        """
+        tf_wds = self.get_tf_wd_dict()
+        
+        similarity_scores = self.get_similarty_score_dict(self.query, tf_wds)
+
+        return self.get_top_relevant_doc_ids(similarity_scores)
+
+
     def tfidf_retrieval(self) -> list:
         """
+        Vector space retrieval model: term frequency x inverse document frequency\n
         Implements the principle of less frequent terms are more informative
         Multiplies the term frequency by the inverse document frequency 
         to provide a better term weighting scheme
