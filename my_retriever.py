@@ -39,6 +39,12 @@ class Retrieve:
         self.query = self.process_query(query)
         self.update_relevant_doc_ids()
 
+        # apply term frequency moderation to query
+        if self.moderate_term_frequency == 'log_tf':
+            self.query = self.apply_log_tf({0:self.query})[0]
+        elif self.moderate_term_frequency == 'max_tf_norm':
+            self.query = self.apply_max_tf_normalization({0:self.query})[0]
+
         # call respective retrieval methods for the different term weighting options
         if self.term_weighting == 'binary':
             return self.binary_retrieval()
@@ -113,9 +119,9 @@ class Retrieve:
         tf_wds = self.get_tfs() # term frequencies tf, of terms w, in a document d
         idfs = self.get_idfs() # inverse document frequencies
 
-        # vector of representation of query: 1 x idfs = idfs (?) -> No
-        query_tfidfs = self.get_query_tfidfs(idfs)
-        document_tfidfs = self.get_document_tfidfs(tf_wds, idfs)
+        # 0 is a dummy document id, allow us to make use of `get_document_tfidfs` function
+        query_tfidfs = self.get_document_tfidfs({0:self.query}, idfs)[0] # {query term: tfidf}
+        document_tfidfs = self.get_document_tfidfs(tf_wds, idfs) # {doc_id: {term: tfidf}}
 
         similarity_scores = self.get_similarty_scores(query_tfidfs, document_tfidfs)
 
@@ -189,16 +195,9 @@ class Retrieve:
 
         # {term: idf}
         # idf = number of documents in collection / document frequency
-        idfs = {w:math.log(self.num_docs/df_ws[w]) for w in df_ws}
+        idfs = {w:math.log(self.num_docs/df_ws[w]) for w in self.query}
 
         return idfs
-
-
-    def get_query_tfidfs(self, idfs: dict) -> dict:
-        """
-        Return a dictionary which maps query terms to tfidfs (tf x idf)
-        """
-        return {w:self.query[w]*idfs[w] for w in self.query}
 
 
     def get_document_tfidfs(self, tf_wds: dict, idfs: dict) -> dict:
@@ -215,15 +214,22 @@ class Retrieve:
         return tfidfs
 
 
-    def get_similarty_scores(self, query_tfidfs: dict, document_tfidfs: dict) -> dict:
+    def get_similarty_scores(self, query_weights: dict, document_weights: dict) -> dict:
         """
         Return a dictionary which maps document id to a similarity score,
         the bigger the higher ranked the document relevance
         """
         similarity_scores = {} # between a query and each relevant document
-        for doc_id in document_tfidfs:
-            similarity_scores[doc_id] = (sum([q*d for q,d in zip(query_tfidfs.values(), document_tfidfs[doc_id].values())]) /
-                (math.sqrt(sum([q*q for q in query_tfidfs.values()])) * math.sqrt(sum([d*d for d in document_tfidfs[doc_id].values()]))))
+        for doc_id in document_weights:
+            # sum of products of q_i and d_i term weights
+            sum_prod_q_d = sum([q*d for q,d in zip(query_weights.values(), document_weights[doc_id].values())])
+
+            # square root of the sum of each q_i term weight squared
+            sqrt_sum_q_sq = math.sqrt(sum([q*q for q in query_weights.values()]))
+            # square root of the sum of each d_i term weight squared
+            sqrt_sum_d_sq = math.sqrt(sum([d*d for d in document_weights[doc_id].values()]))
+
+            similarity_scores[doc_id] = sum_prod_q_d / (sqrt_sum_q_sq * sqrt_sum_d_sq)
         
         return similarity_scores
 
