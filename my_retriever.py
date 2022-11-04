@@ -51,8 +51,8 @@ class Retrieve:
     def process_query(self, query: list) -> dict:
         """
         Remove terms from query which don't occur in index and
-        return query list as a dictionary which maps query terms to their frequency,
-        to take into account of multiple occurrences of terms, e.g. after stemming
+        return query list as a dictionary which maps query terms to their frequency
+        in the query, to take into account of multiple occurrences of terms
         """
         # iterate through a copy of the query list, so we can modify original one
         # without running into issues
@@ -108,7 +108,7 @@ class Retrieve:
         Vector space retrieval model: term frequency x inverse document frequency\n
         Implements the principle of less frequent terms are more informative
         Multiplies the term frequency by the inverse document frequency 
-        to provide a better term weighting scheme
+        to provide an extension to the term weighting scheme
         """
         tf_wds = self.get_tfs() # term frequencies tf, of terms w, in a document d
         idfs = self.get_idfs() # inverse document frequencies
@@ -130,22 +130,34 @@ class Retrieve:
         tf_wds = {}
         for doc_id in self.relevant_doc_ids:
             tf_wd = {}
+            # for each term in query check if it's in index
             for w in self.query:
                 if doc_id in self.index[w]:
-                    # moderate term frequency
-                    if self.moderate_term_frequency == 'log_tf':
-                        tf_wd[w] = 1+math.log(self.index[w][doc_id])
-                    else:
-                        tf_wd[w] = self.index[w][doc_id]
+                    # if in index, record its occurrences in a document
+                    tf_wd[w] = self.index[w][doc_id]
                 else: # if a query term doesn't occur in a document
                     tf_wd[w] = 0
 
             tf_wds[doc_id] = tf_wd
         
         # moderate term frequency
-        if self.moderate_term_frequency == 'max_tf_norm':
+        if self.moderate_term_frequency == 'log_tf':
+            tf_wds = self.apply_log_tf(tf_wds)
+        elif self.moderate_term_frequency == 'max_tf_norm':
             tf_wds = self.apply_max_tf_normalization(tf_wds)
 
+        return tf_wds
+
+
+    def apply_log_tf(self, tf_wds: dict) -> dict:
+        """
+        Return a term frequency dict with the 1+log(raw frequency count) applied
+        """
+        for doc_id in tf_wds:
+            for w in tf_wds[doc_id]:
+                if tf_wds[doc_id][w] != 0:
+                    tf_wds[doc_id][w] = 1+math.log(tf_wds[doc_id][w])
+        
         return tf_wds
 
 
