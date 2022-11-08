@@ -152,7 +152,6 @@ class Retrieve:
         """
         relevant_tf_wds = self.get_relevant_tf_wds()
         for doc_id in self.relevant_doc_ids:
-            # replace dict values with the sum of all query term occurrences in a document
             query_term_occurrences = []
             for w in self.query:
                 if w in relevant_tf_wds[doc_id]:
@@ -160,6 +159,7 @@ class Retrieve:
                 else:
                     query_term_occurrences.append(0)
             
+            # obtain dict with the sum of all query term occurrences in a document
             relevant_tf_wds[doc_id] = sum(query_term_occurrences)
 
         return self.get_top_relevant_doc_ids(relevant_tf_wds)
@@ -208,7 +208,6 @@ class Retrieve:
             idfs[w] = idf
         
         tfidfs = {} # {doc_id: {term: frequency}}
-
         tf_wds = query_tf if query_tf else self.tf_wds
         for doc_id in tf_wds:
             tf_wd = tf_wds[doc_id] # {term: frequency}
