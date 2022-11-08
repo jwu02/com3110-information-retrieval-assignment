@@ -1,4 +1,3 @@
-from collections import Counter
 import math
 
 
@@ -66,9 +65,14 @@ class Retrieve:
             if w not in self.index:
                 query.remove(w)
         
-        query_term_count = Counter(query)
+        query_term_count = {}
+        for w in query:
+            if w in query_term_count:
+                query_term_count[w] += 1
+            else:
+                query_term_count[w] = 1
 
-        return dict(query_term_count)
+        return query_term_count
 
 
     def update_relevant_doc_ids(self):
@@ -90,8 +94,7 @@ class Retrieve:
         tf_wds = self.get_tfs()
         
         for doc_id in tf_wds:
-            # replace dict values with the sum of all query term occurrences 
-            # in a document
+            # replace dict values with the sum of all query term occurrences in a document
             tf_wds[doc_id] = sum(tf_wds[doc_id].values())
 
         return self.get_top_relevant_doc_ids(tf_wds)
@@ -173,10 +176,10 @@ class Retrieve:
         Has the effect of normalising the raw frequency count by the freqeuncy\n
         of the most frequent term in each document
         """
-        a = 0.3 # smoothing factor
+        a = 0.4 # smoothing factor
 
         for doc_id in tf_wds:
-            # max term frequency count of for a document d
+            # max term frequency count for a document d
             tf_max_d = max(tf_wds[doc_id].values())
 
             for w in tf_wds[doc_id]:
@@ -224,12 +227,14 @@ class Retrieve:
             # sum of products of q_i and d_i term weights
             sum_prod_q_d = sum([q*d for q,d in zip(query_weights.values(), document_weights[doc_id].values())])
 
-            # square root of the sum of each q_i term weight squared
-            sqrt_sum_q_sq = math.sqrt(sum([q*q for q in query_weights.values()]))
+            # # square root of the sum of each q_i term weight squared
+            # sqrt_sum_q_sq component constant across comparisons for a single query, so can be dropped
+            # sqrt_sum_q_sq = math.sqrt(sum([q*q for q in query_weights.values()]))
             # square root of the sum of each d_i term weight squared
             sqrt_sum_d_sq = math.sqrt(sum([d*d for d in document_weights[doc_id].values()]))
 
-            similarity_scores[doc_id] = sum_prod_q_d / (sqrt_sum_q_sq * sqrt_sum_d_sq)
+            # similarity_scores[doc_id] = sum_prod_q_d / (sqrt_sum_q_sq * sqrt_sum_d_sq)
+            similarity_scores[doc_id] = sum_prod_q_d / sqrt_sum_d_sq
         
         return similarity_scores
 
